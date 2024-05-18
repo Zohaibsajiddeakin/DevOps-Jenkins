@@ -1,64 +1,83 @@
 pipeline {
-  agent any 
+    agent any
 
-  triggers {
-    pollSCM(scmpoll_spec: 'H/5 * * * *')
-  }
+    environment {
+        // Define any environment variables if needed
+        DOCKER_IMAGE = "my-app:${env.BUILD_ID}"
+    }
 
-  stages {
-    stage('Build') {
-      steps {
-        echo 'Building code using Maven'
-      }
-    }
-    stage('Unit and Integration Tests') {
-      steps {
-        echo 'Running unit tests with JUnit'
-        echo 'Running integration tests'
-      }
-      post {
-        always {
-          emailext (
-            body: 'Unit and Integration Tests - ${currentBuild.result}',
-            subject: 'Jenkins Pipeline - Unit and Integration Tests Results',
-            to: 'd4afnan@gmail.com',
-          )
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    echo 'Building the application...'
+                    bat 'mvn clean package'
+                }
+            }
+            post {
+                success {
+                    archiveArtifacts artifacts: '**/target/*.jar', allowEmptyArchive: true
+                    echo 'Build artifacts archived.'
+                }
+            }
         }
-      }
-    }
-    stage('Code Analysis') {
-      steps {
-        echo 'Running code analysis with SonarQube'
-      }
-    }
-    stage('Security Scan') {
-      steps {
-        echo 'Running security scan with SAST tool'
-      }
-      post {
-        always {
-          emailext (
-            body: 'Security Scan - ${currentBuild.result}',
-            subject: 'Jenkins Pipeline - Security Scan Results',
-            to: 'd4afnan@gmail.com',
-          )
+
+        stage('Test') {
+            steps {
+                script {
+                    echo 'Running tests...'
+                    bat 'mvn test'
+                }
+            }
+            post {
+                success {
+                    junit '**/target/surefire-reports/*.xml'
+                    echo 'Test results published.'
+                }
+
+            }
         }
-      }
+
+        stage('Deploy') {
+            steps {
+                script {
+                    echo 'Deploying the application...'
+                    bat """
+                        docker build -t %DOCKER_IMAGE% .
+                        docker run -d -p 8080:8080 %DOCKER_IMAGE%
+                    """
+                }
+            }
+            post {
+                success {
+                    echo 'Deployment succeeded.'
+                }
+            }
+        }
+
+        stage('Release') {
+            steps {
+                script {
+                    echo 'Releasing the application...'
+                    bat """
+                        git tag -a v%BUILD_ID% -m "Release version %BUILD_ID%"
+                        git push origin v%BUILD_ID%
+                    """
+                }
+            }
+            post {
+                success {
+                    mail to: 'team@example.com',
+                         subject: "Release Successful: ${currentBuild.fullDisplayName}",
+                         body: "Build ${currentBuild.fullDisplayName} has been successfully released."
+                }
+            }
+        }
     }
-    stage('Deploy to Staging') {
-      steps {
-        echo 'Deploying application to Staging server'
-      }
+
+    post {
+        always {
+            cleanWs()
+        }
     }
-    stage('Integration Tests on Staging') {
-      steps {
-        echo 'Running integration tests on Staging environment'
-      }
-    }
-    stage('Deploy to Production') {
-      steps {
-        echo 'Deploying application to Production server'
-      }
-    } 
-  } 
 }
