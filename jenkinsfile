@@ -67,7 +67,7 @@ pipeline {
             }
             post {
                 success {
-                    mail to: 'team@example.com',
+                    mail to: 's223192485@deakin.edu.au',
                          subject: "Release Successful: ${currentBuild.fullDisplayName}",
                          body: "Build ${currentBuild.fullDisplayName} has been successfully released."
                 }
