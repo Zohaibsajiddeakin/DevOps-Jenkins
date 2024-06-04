@@ -1,2 +1,0 @@
-testing devops jenkins pipelines
-testing
